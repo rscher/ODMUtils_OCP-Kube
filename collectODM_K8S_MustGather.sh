@@ -7,7 +7,8 @@
 #   Collects diagnostics, system info and logs for a specified namespace
 #   
 #  Usage: collectODM_K8S_MustGather.sh  arg1=<namespace>  arg2=[deployment]  [options]
-#   Use "collectODM_K8S_MustGather.sh " for command options
+#   run 'collectODM_K8S_MustGather.sh' with no args for help
+#   run 'collectODM_K8S_MustGather.sh options' for command options
 #    
 #   Required:
 #    arg1 =  <namespace>
