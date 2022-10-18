@@ -31,6 +31,7 @@
 #     System/Cluster/Image Registry Files
 #      ./system-info.log (Host/OS info)
 #      ./container_images.log  (lists container images with digests from registry)
+#      ./configmaps.log  (yaml output for each odm configmap in namespace)
 #      ./kube_config.log (Kubernetes config info , tokens/secrets are redacted)
 #      ./<namespace_podname>.log created for each running pod in namespace
 #
@@ -53,12 +54,13 @@
 #     example usage of --remove_javadumps option:
 #      Removes all generated javadumps from each pod in 'cp2201' namespace
 #      $ collectODM_K8S_MustGather.sh cp2201 --remove_javadumps
-#
-#   Generated tar file contents:
-#     Logs/javadumps: archive created for each running pod in namespace
-#     ./<namespace>.<podname>.tar
-#     ./opt/ibm/wlp/output/defaultServer/heapdump.<timestamp>.phd
-#     ./opt/ibm/wlp/output/defaultServer/javacore.<timestamp>.txt
+# ------------------------
+#    Generated tar file contents with javadumps:
+#     javadump archive created for each running pod in namespace: <javadump dir>/<namespace>-<podname>.javadump.<timestamp>.tar 
+#      (where javadump dir=./<namespace>-<podname>.javadump)
+#     javadump archive expanded: 
+#       <javadump dir>/opt/ibm/wlp/output/defaultServer/heapdump.<timestamp>.phd
+#       <javadump dir>/opt/ibm/wlp/output/defaultServer/javacore.<timestamp>.txt
 #
 #  Note: If there are no running ODM containers, 
 #        script will collect System/Cluster/Image Registry Info only
@@ -85,14 +87,12 @@ unset exitMode
 CUR_DIR=$(pwd)
 TEMP_FOLDER="$HOME/.tmp"
 TIMESTAMP=`date "+%Y%m%d.%H%M%S"`
-red='\e[31m' ; clear='\e[0m'
+red='\e[31m' ; yellow='\e[33m' ; clear='\e[0m'
 DEV_NULL=/dev/null
 
-#---cmds----
 validate_ns="kubectl get ns $1 -o name  --ignore-not-found=true | grep $1 "
 wlpServerPathContainer=/opt/ibm/wlp/output/defaultServer
 wlpServerCmdContainer=/liberty/wlp/bin/server
-
 dbserver="dbserver"
 dsrPods="decisionserverruntime"
 dcPods="decisioncenter"
@@ -100,6 +100,7 @@ drPods="decisionrunner"
 dscPods="decisionserverconsole"
 
 # ----- functions -------
+
 function getPodLogs()
 {
  pods=$(kubectl get pods --field-selector=status.phase=Running | grep $deployment | gawk '{print $1}')
@@ -116,8 +117,9 @@ function getPodLogs()
    done
   elif [[ $javadumps == "true" ]] ; then
    echo "Generating javadumps for pod/$pod in deployment/$deployment ..."
+   if [ ! -d  $TEMP_FOLDER/$pod.javadump ] ; then  mkdir -p $TEMP_FOLDER/$pod.javadump &> $DEV_NULL ; fi
    kubectl exec -n $ns $pod -- $wlpServerCmdContainer javadump defaultServer --include=heap,thread >> $TEMP_FOLDER/javadump.$TIMESTAMP.log
-   kubectl exec -n $ns $pod -- tar cf  - $wlpServerPathContainer > $TEMP_FOLDER/$pod.tar
+   kubectl exec -n $ns $pod -- tar Pcf  - $wlpServerPathContainer > $TEMP_FOLDER/$pod.javadump/$pod.javadump.$TIMESTAMP.tar
    echo "Collecting logs for pod/$pod in deployment/$deployment ..."
    kubectl describe pod $pod  &> ${TEMP_FOLDER}/describe-$pod.log
    kubectl logs $pod  &> ${TEMP_FOLDER}/$pod.log
@@ -145,8 +147,7 @@ fi
 
 function separator
 {
- echo "_________________________________________"  &>> ${TEMP_FOLDER}/system-info.log
- echo ""  &>> ${TEMP_FOLDER}/system-info.log
+ echo "_________________________________________"  &>> ${TEMP_FOLDER}/system-info.log ; echo ""  &>> ${TEMP_FOLDER}/system-info.log
 }
 
 function getSystemInfo
@@ -200,11 +201,49 @@ then
 fi
 separator
 
-echo "Helm info:" &>> ${TEMP_FOLDER}/system-info.log
-helm version  &>> ${TEMP_FOLDER}/system-info.log
-echo "Helm charts deployed:" &>> ${TEMP_FOLDER}/system-info.log
-helm ls -A &>> ${TEMP_FOLDER}/system-info.log
+if command -v "helm" &> $DEV_NULL
+then
+ echo "Helm info:" &>> ${TEMP_FOLDER}/system-info.log
+ helm version  &>> ${TEMP_FOLDER}/system-info.log
+ echo "Helm charts deployed:" &>> ${TEMP_FOLDER}/system-info.log
+ helm ls -A &>> ${TEMP_FOLDER}/system-info.log
+fi
+
 separator
+
+echo "-ODM on CP4BA or K8S related-" &>> ${TEMP_FOLDER}/system-info.log
+echo "Configmaps:" &>> ${TEMP_FOLDER}/system-info.log
+kubectl get configmaps &>> ${TEMP_FOLDER}/system-info.log
+echo "" &>> ${TEMP_FOLDER}/system-info.log
+echo "CSV:" &>> ${TEMP_FOLDER}/system-info.log
+kubectl get csv  &>>  ${TEMP_FOLDER}/system-info.log
+echo "" &>> ${TEMP_FOLDER}/system-info.log
+echo "Routes:" &>> ${TEMP_FOLDER}/system-info.log
+kubectl get route  &>> ${TEMP_FOLDER}/system-info.log
+echo "" &>> ${TEMP_FOLDER}/system-info.log
+echo "MCP:" &>> ${TEMP_FOLDER}/system-info.log
+kubectl get mcp &>> ${TEMP_FOLDER}/system-info.log
+echo "" &>> ${TEMP_FOLDER}/system-info.log
+echo "icp4acluster:" &>> ${TEMP_FOLDER}/system-info.log
+kubectl get icp4acluster -o yaml &>> ${TEMP_FOLDER}/system-info.log
+echo "" &>> ${TEMP_FOLDER}/system-info.log
+echo "PVC:" &>> ${TEMP_FOLDER}/system-info.log
+kubectl get pvc &>> ${TEMP_FOLDER}/system-info.log
+echo "" &>> ${TEMP_FOLDER}/system-info.log
+echo "Secrets:" &>> ${TEMP_FOLDER}/system-info.log
+kubectl get secrets &>> ${TEMP_FOLDER}/system-info.log
+echo "" &>> ${TEMP_FOLDER}/system-info.log
+echo "CSV ibm-common-services:" &>> ${TEMP_FOLDER}/system-info.log
+kubectl get csv -n ibm-common-services  &>> ${TEMP_FOLDER}/system-info.log
+echo "" &>> ${TEMP_FOLDER}/system-info.log
+
+touch ${TEMP_FOLDER}/configmaps.log
+configmaps=$(kubectl get configmap -n $ns  | grep -i odm | awk '{print $1}')
+for cfgmap in $configmaps
+ do
+  echo "$cfgmap:"  &>> ${TEMP_FOLDER}/configmaps.log
+  kubectl get configmap -n $ns  $cfgmap -o yaml &>> ${TEMP_FOLDER}/configmaps.log
+ done
 }
 
 
@@ -295,7 +334,7 @@ if [[ $2 != "" ]] ; then
    --remove_javadumps) remove_javadumps=true ;;
    --clusterdump) clusterdump=true ;;
    --help) exitMode="usage" ;;
-   *) echo -e $red"error: $2 not a valid option"$clear ; echo "" ; exitMode="usage" ;;
+   *) echo -e $red"error: $2 not a valid option"$clear ; exitMode="usage" ;;
   esac
 fi
 
@@ -312,7 +351,7 @@ elif  [[ $3 == "--clusterdump" ]] ; then
 elif [[ $3 == "--help" ]] ; then
  exitMode="usage"
 elif  [[ $3 != "" ]] ; then
- echo "warning: ignoring $3"
+ echo -e $yellow"warning: ignoring argument $3"$clear
  echo ""
 fi
 
