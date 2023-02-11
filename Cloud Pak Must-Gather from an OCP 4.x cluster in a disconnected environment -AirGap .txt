@@ -1,0 +1,193 @@
+
+Cloud Pak Must-Gather from an OCP 4.x cluster in a disconnected environment (AirGap):
+
+All the Cloud Pak images mirrored in the local repository include, "ibm-healthcheck-operator" . Follow the instruction "Using MustGather as a part of ibm-healthcheck-operator" to install the operator and collect the dignostics using the Administration panel 
+
+ 
+
+The following instructions describe how to download the must-gather image from an internet-connected environment and load the image to the disconnected registry. 
+
+You can check the latest version available at https://quay.io/repository/opencloudio/must-gather?tab=tags and replace version 4.5.16 with the latest version you want to download in the following commands
+ 
+
+a. Pull the image using a server connected to the external internet
+
+
+
+    podman pull quay.io/opencloudio/must-gather:4.5.16
+
+     podman pull quay.io/opencloudio/must-gather:4.5.16
+    Trying to pull quay.io/opencloudio/must-gather:4.5.16...
+    Getting image source signatures
+    Copying blob 54e56e6f8572 done
+    Copying blob 5faf81a89a13 done
+    Copying blob 6659fabff68f done
+    Copying blob 4f8ddd7f5a75 done
+    Copying blob f5fcdf6cebe4 done
+    Copying blob b3f66b2beec9 done
+    Copying blob a3bb5ff9a257 done
+    Copying config 35be2d0789 done
+    Writing manifest to image destination
+    Storing signatures
+    35be2d078930d2ec40da92db9f51c606070293e1b161cd68efd1a15bc21d661a
+
+    b. Make sure the image has been pulled 
+     
+
+     
+    podman images | egrep "must-gather"
+    podman images
+    REPOSITORY                       TAG         IMAGE ID      CREATED      SIZE
+    quay.io/opencloudio/must-gather  4.5.16      35be2d078930  13 days ago  299 MB
+
+
+c. Save the image as a tar file
+
+     
+    podman save quay.io/opencloudio/must-gather:4.5.16 -o cp-mustgather-local.4.5.16.tar
+
+
+d. Copy the tar file to the bastion node accessible to the disconnected cluster registry
+
+e. Load the image to the registry where the cluster can access the image
+
+      
+    sudo podman load -i cp-mustgather-local.4.5.16.tar
+    Getting image source signatures
+    Copying blob c2a45868a548 done
+    Copying blob f1ccf0afcb5e done
+    Copying blob 5dcc13c686a7 done
+    Copying blob a11a4bc1548b done
+    Copying blob 235cb1df51fd done
+    Copying blob 87158b7b5345 done
+    Copying blob 6d953f4b96af done
+    Copying config 35be2d0789 done
+    Writing manifest to image destination
+    Storing signatures
+    Loaded image(s): @35be2d078930d2ec40da92db9f51c606070293e1b161cd68efd1a15bc21d661a
+
+
+    f. TAG the image with an appropriate name  
+
+
+find the imageID  using the command "podman images" and tag it with an appropriate name for the image 
+
+      
+
+    For Example
+
+    podman image tag 390b1e2f3e41 my/must-gather:4.5.16
+
+
+
+g.  Run Cloud Pak must-gather from the local repository 
+
+     oc adm must-gather --image=localhost/my/must-gather:4.5.16 -- gather -n common-service,ibm-common-services,otherNameSpaces 
+
+You can add more namespaces with comma separation -n ibm-common-services,cp4i,ace, etc. Review the "Cloud Pak must-gather from OCP 4.x cluster with access to internet" section for more options for modules and namespace options /div>
+
+Upload the cloudpak-must-gather-xxx.tar.gz file generated under the must-gather.local.xxx/quay-io-opencloudio-must-gather-xxxx directory.  
+
+Attach the .tgz output file that contains the support information when you submit the support case on the IBM Support Portal.
+TIPS : 
+
+If you need to push the image to the mirror registry, so you can access it from all the clusters behind the firewall, Tag the image as needed and push the image
+For Example:
+
+ 
+podman login -u myuser -p mypassword mirror4Airgap1.fyre.ibm.com:5000 
+podman tag 35be2d078930  mirror4Airgap1.fyre.ibm.com:5000/opencloudio/must-gather:4.5.16
+podman push  mirror4Airgap1.fyre.ibm.com:5000/opencloudio/must-gather:4.5.16
+podman images  mirror4Airgap1.fyre.ibm.com:5000/opencloudio/must-gather
+
+Gather debugging information by using "inspect":
+
+Gather debugging information for a particular resource. For example, you can run the following command.
+Example:
+
+
+# oc adm inspect clusteroperator/openshift-apiserver 
+
+ 
+# oc adm inspect $(oc get co -o name) clusterversion/version ns/openshift-cluster-version $(oc get node -o name) ns/default ns/openshift ns/kube-system ns/openshift-etcd 
+
+Red Hat OpenShift 4.x diagnostics Scripts:
+The must-gather code deploys a pod on the cluster to collect the cluster information. If you cannot run the must-gather tool, use the following scripts to gather cluster information. 
+
+ 
+export MGDIR=cp-MG-Script-$(date '+%y%b%dT%H-%M-%S')
+export LOGLIMIT="--tail=1000"
+mkdir -p $MGDIR
+oc get node,hostsubnet -o wide > $MGDIR/node-list.txt
+oc adm top nodes > $MGDIR/node-detail-list.txt
+oc get all,events  -o wide -n default > $MGDIR/all-event.txt
+
+oc describe nodes > $MGDIR/node-describe.txt
+oc get namespaces > $MGDIR/namespaces.txt
+
+oc get clusteroperators > $MGDIR/cluster-operators.txt
+oc adm top pod --all-namespaces  > $MGDIR/TopNameSapce.txt
+oc get pods --all-namespaces -owide --show-labels > $MGDIR/pods-operators.txt 
+oc get po --all-namespaces -o wide| grep -Ev '([[:digit:]])/\1.*R' | egrep -v "Completed" > $MGDIR/podsNotRunning-list.txt 
+
+#ocp upgrade related
+oc get clusterversion -o jsonpath='{.items[].spec.clusterID}{"\n"}' > $MGDIR/clusterID.txt
+oc get clusterversion -o yaml > $MGDIR/ocpclusterversion.txt
+oc logs $(oc get pod -n openshift-cluster-version -l k8s-app=cluster-version-operator -oname) -n openshift-cluster-version > $MGDIR/clusterVersionOperator-Upgrade.log
+oc get mcp > $MGDIR/machineConfigPool.txt
+oc describe mcp >> $MGDIR/machineConfigPool.txt
+oc get co/machine-config > $MGDIR/co-machineConfig.txt
+oc describe co/machine-config >> $MGDIR/co-machineConfig.txt
+
+oc get cm  ibmcloud-cluster-info -o yaml > $MGDIR/ibmcloud-cluster-info-ConfigMap.txt
+oc get installplan -A > $MGDIR/installplan.txt  
+
+
+oc get certificates.certmanager.k8s.io --all-namespaces -owide --show-labels > $MGDIR/certificates.txt
+oc get challenges.certmanager.k8s.io --all-namespaces -owide --show-labels > $MGDIR/challengesCert.txt
+oc get clusterissuers.certmanager.k8s.io --all-namespaces -owide --show-labels > $MGDIR/clusterissuers.txt
+
+oc get configmap --all-namespaces -owide --show-labels > $MGDIR/configmap.txt
+oc get crd --all-namespaces -owide --show-labels > $MGDIR/crd.txt
+oc get cronjob --all-namespaces -owide --show-labels > $MGDIR/cronjob.txt
+oc get csv --all-namespaces -owide --show-labels > $MGDIR/csv.txt
+oc get ds --all-namespaces -owide --show-labels > $MGDIR/ds.txt
+oc get endpoints --all-namespaces -owide --show-labels > $MGDIR/endpoints.txt
+oc get event --all-namespaces -owide --show-labels > $MGDIR/event.txt
+oc get hpa --all-namespaces -owide --show-labels > $MGDIR/hpa.txt
+oc get ingress --all-namespaces -owide --show-labels > $MGDIR/ingress.txt
+oc get issuers.certmanager.k8s.io --all-namespaces -owide --show-labels > $MGDIR/issuers.txt
+oc get job --all-namespaces -owide --show-labels > $MGDIR/job.txt
+oc get namespace --all-namespaces -owide --show-labels > $MGDIR/namespace.txt
+oc get networkpolicy --all-namespaces -owide --show-labels > $MGDIR/networkpolicy.txt
+oc get authentications.operator.ibm.com --all-namespaces > $MGDIR/authentications.txt
+oc get orders.certmanager.k8s.io --all-namespaces -owide --show-labels > $MGDIR/orders.certmanager.txt
+oc get pvc --all-namespaces -owide --show-labels > $MGDIR/pvc.txt
+oc get pv --all-namespaces -owide --show-labels > $MGDIR/pv.txt
+
+oc get resourcequota --all-namespaces -owide --show-labels > $MGDIR/resourcequota.txt
+oc get route --all-namespaces -owide --show-labels > $MGDIR/route.txt
+oc get secret --all-namespaces -owide --show-labels > $MGDIR/secret.txt
+oc get svc --all-namespaces -owide --show-labels > $MGDIR/svc.txt
+oc get sts --all-namespaces -owide --show-labels > $MGDIR/sts.txt
+oc status --all-namespaces > $MGDIR/status.txt
+oc get storageclass --all-namespaces -owide --show-labels > $MGDIR/storageclass.txt
+
+
+#If you have a large number of projects and namespace, you can reduce data colleted by specifying the limited namespace in the for loop
+
+for NS in `oc get ns | awk 'NR>1 && (/openshift/ || /common/ ||/kube/ || /infra/){ORS=" "; print $1}'` default; do
+ export NS=$NS; mkdir $MGDIR/$NS; echo gathering info from namespace $NS
+ oc get all,secrets,cm,events -n $NS -o wide &> $MGDIR/$NS/all-list.txt
+ oc get pods -n $NS | awk 'NR>1{print "oc -n $NS describe pod "$1" > $MGDIR/$NS/"$1"-describe.txt && echo described "$1}' | bash
+ oc get pods -n $NS -o go-template='{{range $i := .items}}{{range $c := $i.spec.containers}}{{println $i.metadata.name $c.name}}{{end}}{{end}}' > $MGDIR/$NS/container-list.txt
+ awk '{print "oc -n $NS logs "$1" -c "$2" $LOGLIMIT -p > $MGDIR/$NS/"$1"_"$2"_previous.log && echo gathered previous logs of "$1"_"$2}' $MGDIR/$NS/container-list.txt | bash
+ awk '{print "oc -n $NS logs "$1" -c "$2" $LOGLIMIT > $MGDIR/$NS/"$1"_"$2".log && echo gathered logs of "$1"_"$2}' $MGDIR/$NS/container-list.txt | bash
+done
+
+tar czf CaseTS123456-$MGDIR.tgz $MGDIR/ # replace case number TS123456 
+
+
+
+ 
+
