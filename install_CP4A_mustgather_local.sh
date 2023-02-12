@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 #------------------------------------------
 # 
 # Usage: install_CP4A_must-gather_local.sh -U <OpenShift username> -P <OpenShift password> -s <OpenShift API server> -u <registry username> -p <registry password> 
@@ -133,7 +133,7 @@ if [[ $dryRun == "true" ]] ; then
 else
  runCmdMsg="running cmd:"
 fi
- 
+
 echo "installing $mustGatherImagePath/cp-mustgather-local.$imageTag.tar.gz ..."
 if [[ $clean == "clean" ]] ; then
   cmd=$(sudo  podman images -a --log-level $loglevel | grep must-gather | awk '{print $3}'  | xargs sudo podman rmi -fi )
@@ -142,21 +142,28 @@ if [[ $clean == "clean" ]] ; then
 fi
 
 cmd=$(sudo podman image load --input $mustGatherImagePath/cp-mustgather-local.$imageTag.tar.gz --log-level $loglevel)
-echo $runCmdMsg $cmd
-if [[ $dryRun == "false" ]] ; then $cmd ; fi
+# echo $runCmdMsg $cmd
+# if [[ $dryRun == "false" ]] ; then $cmd ; fi
+sudo podman image load --input $mustGatherImagePath/cp-mustgather-local.$imageTag.tar.gz
 
-cmd=$(sudo podman images --log-level $loglevel | grep must-gather | awk '{print $3}') 
-echo $runCmdMsg $cmd
-if [[ $dryRun == "false" ]] ; then imageID=$cmd ; fi
+# cmd=$(sudo podman images --log-level $loglevel | grep none| awk '{print $3}') 
+# echo $runCmdMsg $cmd
+# if [[ $dryRun == "false" ]] ; then imageID=$cmd ; fi
+imageID=$(sudo podman images --log-level $loglevel | grep none| awk '{print $3}')
 
-cmd=$(sudo podman tag $imageID $registry/$ns/must-gather:$imageTag)
-echo $runCmdMsg $cmd
-if [[ $dryRun == "false" ]] ; then $cmd ; fi
+# cmd=$(sudo podman tag $imageID $registry/$ns/must-gather:$imageTag)
+# echo $runCmdMsg $cmd
+# if [[ $dryRun == "false" ]] ; then $cmd ; fi
+echo "sudo podman tag $imageID $registry/$ns/must-gather:$imageTag"
+sudo podman tag $imageID $registry/$ns/must-gather:$imageTag
 
-cmd=$(sudo podman push  --creds $reguser:$reguser_pw $registry/$ns/must-gather:$imageTag)
-echo $runCmdMsg $cmd
-if [[ $dryRun == "false" ]] ; then $cmd ; fi
+# cmd=$(sudo podman push  --creds $reguser:$reguser_pw $registry/$ns/must-gather:$imageTag)
+# echo $runCmdMsg $cmd
+# if [[ $dryRun == "false" ]] ; then $cmd ; fi
+echo "sudo podman push  --creds $reguser:$reguser_pw $registry/$ns/must-gather:$imageTag"
+sudo podman push  --creds $reguser:$reguser_pw $registry/$ns/must-gather:$imageTag
 
 echo "must-gather container installed into $registry/$ns/must-gather:$imageTag"
 echo ""
-echo "usage: oc adm must-gather --image=localhost/$ns/must-gather:$imageTag -- gather -n $ns,ibm-common-services"
+ oc adm must-gather -- gather -m automationfoundation -n cp2103ns,ibm-common-services 
+# echo "usage: oc adm must-gather --image=localhost/$ns/must-gather:$imageTag -- gather -n $ns,ibm-common-services"
