@@ -1,29 +1,94 @@
-#!/bin/bash
+#!/bin/bash 
+#------------------------------------------
+# 
+# Usage: install_CP4A_must-gather_local.sh -U <OpenShift username> -P <OpenShift password> -s <OpenShift API server> -u <registry username> -p <registry password> 
+#        -r <registry host/IP> -n <namespace> -f <folder path to cp-mustgather-local.4.5.16.tar.gz> [ -l loglevel -c clean -d dry-run -I Integrated_OCP_registry]
 #
-# usage: install_CP4A_mustgather_local.sh $1 $2 $3 $4 $5 $6
-# $1=cluster_username
-# $2=cluster_password
-# $3=cluster_API_URL
-# $4=registry
-# $5=namespace
-# $6=path of must-gather.tar.gz
+# Description: Installs cp-mustgather-local.4.5.16 container image to run must-gather in air-gap or disconnected environment
+#
+#  After cp-mustgather-local installed,
+#  run must-gather collector with modified syntax as follows:
+#   $ oc adm must-gather --image=localhost/$ns/must-gather:4.5.16 -- gather -n $ns,ibm-common-services
+#
+# Dependencies: cp-mustgather-local.4.5.16.tar.gz
+#
+# See Usage() for details
 #
 #----------------------------------------------
-if [ $# -ne 6 ] ; then
- echo "usage: install_CP4A_mustgather_local.sh <cluster_username> <cluster_password>  <cluster_API_URL> <registry> <namespace> <path to must-gather.tar.gz>"
- echo "example:"
- echo "./install_CP4A_mustgather_local.sh  kubeadmin kubeadmin_pw  https://api.crc.testing:6443   default-route-openshift-image-registry.apps.your_registry.com  odm8110 $HOME" 
- exit
-fi
-
-kubeuser=$1
-kubeuser_pw=$2
-apiURL=$3
-registry=$4
-ns=$5
-mustGatherImagePath=$6
+NULL=/dev/null
+sp="echo "" "
 red='\e[31m'
 clear='\e[0m'
+imageTag="4.5.16"
+
+# Print usage details if required parameters not validated 
+Usage()
+{
+   $sp
+   echo "usage: install_CP4A_must-gather_local.sh -U <OpenShift username> -P <OpenShift password> -s <OpenShift API server> -u <registry username> -p <registry password> -r <registry host/IP> -n <namespace> -f <folder path to cp-mustgather-local.$imageTag.tar.gz> [ -l loglevel -c clean -d dry-run -I use_OCP_integrated_registry] "
+   $sp
+   echo "Required parameters:"
+   echo -e "\t-U OpenShift username"
+   echo -e "\t-P OpenShift password"
+   echo -e "\t-s OpenShift API server"
+   echo -e "\t-u Registry username"
+   echo -e "\t-p Registry password"
+   echo -e "\t-r Registry server"
+   echo -e "\t-n namespace to install must-gather"
+   echo -e "\t-f dir path of cp-mustgather-local.$imageTag.tar.gz, default is ."
+   $sp
+   echo "Optional parameters:"
+   echo -e "\t-l logging for debugging loglevel [values: debug | info(default) | error]"
+   echo -e "\t-c clean install, if true  remove existing image from registry before installing, default=false"
+   echo -e "\t-d dry-run, If true only print the cmds that would be executed, without executing or modifying system, default=false"
+   echo -e "\t-I Use Integrated OCP registry, default=false. If true, -u <registry username> -p <registry password> are ignored"
+   $sp
+   echo "example:"
+   echo "install_CP4A_mustgather_local.sh -U kubeadmin -P  passw0rd -s https://api.ocp1.fyre.ibm.com:6443 -u jfrog_user1 -p jfrog_passw0rd -r artifactory_dev.fyre.ibm.com  -n cp2103ns -f $HOME/Downloads "
+   exit 1 # Exit script after printing Usage
+}
+
+# set defaults for Optional args
+clean=false
+loglevel=info
+dryRun=false
+mustGatherImagePath="."
+useOCPregistry=false
+
+while getopts "U:P:s:u:p:r:n:f:c:d:I:l:" opt
+do
+   case "$opt" in
+      # -- Required parameters --
+      U ) kubeuser="$OPTARG" ;;
+      P ) kubeuser_pw="$OPTARG" ;;
+      s ) apiURL="$OPTARG" ;;
+      u ) reguser="$OPTARG" ;;
+      p ) reguser_pw="$OPTARG" ;;
+      r ) registry="$OPTARG" ;;
+      n ) ns="$OPTARG" ;;
+      f ) mustGatherImagePath="$OPTARG" ;;
+
+      # -- Optional parameters --
+      c ) clean="$OPTARG" ;;
+      d ) dryRun="$OPTARG" ;;
+      I ) useOCPregistry="$OPTARG" ;;
+      l ) loglevel="$OPTARG" ;;
+      ? ) Usage ;; # Print Usage in case parameter is non-existent
+   esac
+done
+
+if [[ $loglevel == "debug" ]] ; then
+  echo "$0 -U $kubeuser -P $kubeuser_pw -s $apiURL -u $reguser -p $reguser_pw -r $registry -n $ns -f $mustGatherImagePath -l $loglevel -c $clean -d $dryRun -I $useOCPregistry"
+fi
+
+# Validate Required parameter, print Usage if not met  
+if [ "$useOCPregistry" = "true" ] ; then
+ echo "using OpenShift Integrated Registry"
+ if [ -z "$kubeuser" ] || [ -z "$kubeuser_pw" ] || [ -z "$apiURL" ] || \
+    [ -z "$registry" ] || [ -z "$ns" ] || [ -z "$mustGatherImagePath" ] ; then Usage ; fi
+elif [ -z "$kubeuser" ] || [ -z "$kubeuser_pw" ] || [ -z "$apiURL" ] || [ -z "$reguser" ] || \
+     [ -z "$reguser_pw" ] || [ -z "$registry" ] || [ -z "$ns" ] || [ -z "$mustGatherImagePath" ] ; then Usage 
+fi
 
 cluster_login=$(oc login -u $kubeuser -p $kubeuser_pw $apiURL  | grep "Login successful.")
 if [[ $cluster_login == "Login successful." ]] ; then
@@ -34,11 +99,17 @@ else
   exit
 fi
 
-registry_login=$(sudo podman login -u $kubeuser -p $(oc whoami -t) $registry)
+# If OCP_integrated_registry specified, set registry credentials to OCP_user/oc whoami -t
+if [[ $useOCPregistry == "true" ]] ; then
+ reguser=$kubeuser
+ reguser_pw=$(oc whoami -t)
+fi
+
+registry_login=$(sudo podman login -u $reguser -p $reguser_pw  $registry)
 if [[ $registry_login == "Login Succeeded!" ]] ; then
   echo "Docker registry login: $registry_login"
 else
-  echo -e $red"Unable to authenticate to Docker  $registry with credentials: -u $kubeuser -p $kubeuser_pw"$clear 
+  echo -e $red"Unable to authenticate to Docker container registry  $registry with credentials: -u $reguser -p $reguser_pw"$clear 
   echo "You must be logged into the Docker registry to run install_CP4A_mustgather_local.sh "
   exit
 fi
@@ -52,17 +123,40 @@ else
   exit
  fi
 
-if [[ ! -f "$6/must-gather.tar.gz" ]] ; then
-  echo -e $red"must-gather.tar.gz  not found in location: $6 enter valid path for must-gather.tar.gz"$clear  
+if [[ ! -f "$mustGatherImagePath/cp-mustgather-local.$imageTag.tar.gz" ]] ; then
+  echo -e $red"cp-mustgather-local.$imageTag.tar.gz not found in location: $mustGatherImagePath  enter valid path for cp-mustgather-local.$imageTag.tar.gz"$clear  
   exit
 fi
 
-echo "installing $6/must-gather.tar.gz ..."
-sudo podman image load --input $6/must-gather.tar.gz >  /dev/null
-imageID=$(sudo podman images | grep  none | awk '{print $3}' )
+if [[ $dryRun == "true" ]] ; then
+ runCmdMsg="Dry-run mode, running cmd:"
+else
+ runCmdMsg="running cmd:"
+fi
+ 
+echo "installing $mustGatherImagePath/cp-mustgather-local.$imageTag.tar.gz ..."
+if [[ $clean == "clean" ]] ; then
+  cmd=$(sudo  podman images -a --log-level $loglevel | grep must-gather | awk '{print $3}'  | xargs sudo podman rmi -fi )
+  echo $runCmdMsg $cmd
+  if [[ $dryRun == "false" ]] ; then $cmd ; fi
+fi
 
-sudo podman tag $imageID $registry/$ns/must-gather >  /dev/null
-sudo podman push  --creds $kubeuser:$(oc whoami -t) $registry/$ns/must-gather > /dev/null
-echo "must-gather container installed into $registry/$ns/must-gather"
+cmd=$(sudo podman image load --input $mustGatherImagePath/cp-mustgather-local.$imageTag.tar.gz --log-level $loglevel)
+echo $runCmdMsg $cmd
+if [[ $dryRun == "false" ]] ; then $cmd ; fi
+
+cmd=$(sudo podman images --log-level $loglevel | grep must-gather | awk '{print $3}') 
+echo $runCmdMsg $cmd
+if [[ $dryRun == "false" ]] ; then imageID=$cmd ; fi
+
+cmd=$(sudo podman tag $imageID $registry/$ns/must-gather:$imageTag)
+echo $runCmdMsg $cmd
+if [[ $dryRun == "false" ]] ; then $cmd ; fi
+
+cmd=$(sudo podman push  --creds $reguser:$reguser_pw $registry/$ns/must-gather:$imageTag)
+echo $runCmdMsg $cmd
+if [[ $dryRun == "false" ]] ; then $cmd ; fi
+
+echo "must-gather container installed into $registry/$ns/must-gather:$imageTag"
 echo ""
-echo "usage: oc adm must-gather -- gather -m automationfoundation -n $ns"
+echo "usage: oc adm must-gather --image=localhost/$ns/must-gather:$imageTag -- gather -n $ns,ibm-common-services"
