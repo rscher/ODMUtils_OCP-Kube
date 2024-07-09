@@ -1,0 +1,358 @@
+# Default values for odmcharts.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Accept the terms of the IBM license by setting the license parameter to "true"
+license: true
+
+# Users password is required if authSecretRef is not set.
+# Set the password for odm default users.
+usersPassword: "odmAdmin"
+
+image:
+  # repository: "default-route-openshift-image-registry.apps-crc.testing/odm8120"
+  repository: "cp.icr.io/cp/cp4a/odm/"
+  tag: 8.12.0.1-IF005
+  pullPolicy: IfNotPresent
+  pullSecrets: "auth"
+  arch: "amd64"
+
+serviceAccountName: ""
+customization.runAsUser: ""
+
+service:
+  enableTLS: true
+  # type: NodePort
+  type: ClusterIP
+  enableRoute: true
+  hostname: ""
+  ingress:
+    enabled: false
+    annotations:
+    tlsHosts: []
+    tlsSecretRef:
+    host:
+
+decisionServerRuntime:
+  enabled: true
+  tagOrDigest:
+  replicaCount: 1
+  loggingRef:
+  jvmOptionsRef:
+  xuConfigRef:
+  webConfigRef:
+  extendRoleMapping: false
+  enableTLSAuth:
+  customScriptsRef:
+  initContainer:
+    image:
+    command:
+    configRef:
+    configOidcRef:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 200Mi
+    existingClaimName:
+    env:
+  contextRoot:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 200Mi
+    limits:
+      cpu: 2
+      memory: 4096Mi
+      ephemeral-storage: 1G
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 3
+    targetAverageUtilization: 75
+  nodeAffinity:
+  labels: {}
+  networkPolicy:
+    egress:
+    ingress:
+
+decisionServerConsole:
+  tagOrDigest:
+  loggingRef:
+  jvmOptionsRef:
+  extendRoleMapping: false
+  title:
+  description:
+  customScriptsRef:
+  runtime:
+    webConfigRef:
+  initContainer:
+    image:
+    command:
+    configRef:
+    configOidcRef:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 200Mi
+    existingClaimName:
+    env:
+  contextRoot:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 200Mi
+    limits:
+      cpu: 2
+      memory: 1024Mi
+      ephemeral-storage: 1G
+  nodeAffinity:
+  labels: {}
+  networkPolicy:
+    egress:
+    ingress:
+
+decisionCenter:
+  enabled: true
+  tagOrDigest:
+  persistenceLocale: en_US
+  replicaCount: 1
+  customlibPvc:
+  loggingRef:
+  jvmOptionsRef:
+  webConfigRef:
+  extendRoleMapping: false
+  disableAllAuthenticatedUser: false
+  customScriptsRef:
+  initContainer:
+    image:
+    command:
+    configRef:
+    configOidcRef:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 200Mi
+    existingClaimName:
+    env:
+  contextRoot:
+  refererList:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1500Mi
+      ephemeral-storage: 1G
+    limits:
+      cpu: 2
+      memory: 4096Mi
+      ephemeral-storage: 2G
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 3
+    targetAverageUtilization: 75
+  nodeAffinity:
+  labels: {}
+  networkPolicy:
+    egress:
+    ingress:
+
+decisionRunner:
+  enabled: true
+  tagOrDigest:
+  replicaCount: 1
+  loggingRef:
+  jvmOptionsRef:
+  extendRoleMapping: false
+  customScriptsRef:
+  initContainer:
+    image:
+    command:
+    configRef:
+    configOidcRef:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 200Mi
+    existingClaimName:
+    env:
+  contextRoot:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 200Mi
+    limits:
+      cpu: 2
+      memory: 4096Mi
+      ephemeral-storage: 1G
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 3
+    targetAverageUtilization: 75
+  resURL:
+  nodeAffinity:
+  labels: {}
+  networkPolicy:
+    egress:
+    ingress:
+
+# leave blank to use external database in next section
+internalDatabase:
+  databaseName:      
+  tagOrDigest:
+  secretCredentials: ""
+  populateSampleData: false
+  persistence:
+    enabled: true
+    useDynamicProvisioning: false
+    storageClassName: ""
+    resources:
+      requests:
+        storage: 5Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 500Mi
+    limits:
+      cpu: 2
+      memory: 4096Mi
+      ephemeral-storage: 1G
+  runAsUser: 26
+
+externalDatabase:
+  type: ""
+  serverName: ""
+  databaseName: ""
+  url: ""
+  secretCredentials: ""
+  port: ""
+  sslSecretRef:
+  driversUrl: []
+  # - url1
+  # - url2
+  decisionServer:
+    type: "db2"
+    serverName: "192.168.1.8"
+    databaseName: "RESDB812"
+    url: ""
+    secretCredentials: "odm-db-secret"
+    port: "50000"
+    sslSecretRef:
+    driversUrl: []
+    # - url1
+    # - url2
+  decisionCenter:
+    type: "db2"
+    serverName: "192.168.1.8"
+    databaseName: "DCDB8121"
+    url: ""
+    secretCredentials: "odm-db-secret"
+    port: "50000"
+    sslSecretRef:
+    driversUrl: []
+    # - url1
+    # - url2
+externalCustomDatabase:
+  datasourceRef:
+  driverPvc:
+
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 45
+  timeoutSeconds: 5
+
+livenessProbe:
+  initialDelaySeconds: 300
+  periodSeconds: 30
+  failureThreshold: 4
+  timeoutSeconds: 5
+
+customization:
+  readOnlyRootFilesystem: true
+  vault: ""
+  securitySecretRef:
+  baiEmitterSecretRef:
+  authSecretRef:
+  dedicatedNodeLabel:
+  runAsUser: 1001
+  kubeVersion: "ODM on K8s"
+  productName:
+  productID:
+  productVersion:
+  productSemVer:
+  cloudpakID:
+  cloudpakVersion:
+  deployForProduction: true
+  meteringServerUrl:
+  meteringSendPeriod:
+  usageMeteringSecretRef:
+  trustedCertificateList:
+  enableFips: false
+  disableWSJavaAgent: false
+  nodeAffinity:
+  labels: {}
+  seccompProfile:
+    type:
+    localhostProfile:
+  enabledCiphers:
+  customScriptsRef:
+
+dba:
+# if no rootCaSecretRef is defined then no keytoolinit init-container
+  rootCaSecretRef:
+  ldapSslSecretRef:
+  passwordSecretRef:
+  keytoolInitContainer:
+    image:
+    imagePullPolicy:
+    imagePullSecret:
+
+oidc:
+  enabled: false
+  serverUrl:
+  registrationUrl:
+  adminRef:
+  redirectUrisRef:
+  clientRef:
+  provider:
+  allowedDomains:
+  disableLoginPanel:
+  initContainer:
+    image:
+    command:
+    configRef:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 100Mi
+      limits:
+        cpu: 500m
+        memory: 200Mi
+    existingClaimName:
+    env:
+
+networkPolicy:
+  # Enable creation of NetworkPolicy resources.
+  enabled: true
+  egress:
+  ingress:
+  # For Kubernetes v1.4, v1.5 and v1.6, use 'extensions/v1beta1'
+  # For Kubernetes v1.7, use 'networking.k8s.io/v1'
+  apiVersion: networking.k8s.io/v1
