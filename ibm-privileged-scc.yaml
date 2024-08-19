@@ -1,0 +1,44 @@
+# This SCC is the least restrictive, and is meant to be a template
+# Pass the --validate=false flag when applying
+
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: ibm-privileged-scc
+allowHostDirVolumePlugin: true
+allowHostIPC: true
+allowHostNetwork: true
+allowHostPID: true
+allowHostPorts: true
+allowPrivilegedContainer: true
+allowPrivilegeEscalation: true
+allowedCapabilities:
+- '*'
+allowedFlexVolumes: []
+allowedUnsafeSysctls:
+- '*'
+defaultAddCapabilities: []
+defaultAllowPrivilegeEscalation: true
+forbiddenSysctls: []
+fsGroup:
+  type: RunAsAny
+readOnlyRootFilesystem: false
+requiredDropCapabilities: []
+runAsUser:
+  type: RunAsAny
+seccompProfiles:
+- '*'
+# This can be customized for your host machine
+seLinuxContext:
+  type: RunAsAny
+# seLinuxOptions:
+#   level:
+#   user:
+#   role:
+#   type:
+supplementalGroups:
+  type: RunAsAny
+volumes:
+- '*'
+# If you want a priority on your SCC -- set for a value more than 0
+# priority:
